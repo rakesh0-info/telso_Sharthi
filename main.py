@@ -11,6 +11,7 @@ import admin_seed
 
 from controller.publicController import router as public_router
 from controller.SuperAdminController import router as super_admin_router
+from controller.contentAdminController import router as content_admin_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -39,3 +40,4 @@ app.add_middleware(
 
 app.include_router(public_router)
 app.include_router(super_admin_router)
+app.include_router(content_admin_router)
