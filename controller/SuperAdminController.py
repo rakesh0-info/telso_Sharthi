@@ -9,6 +9,7 @@ from requestModel.School_Request import create_schools
 from requestModel.User_Request import create_users,AssignAchoolAdmin
 from databaseModel.School_model import School
 from util_validate.password_security import hash_password
+from enums.userActivationEnum import activation
 
 
 
@@ -216,9 +217,25 @@ async def action_School(
     school = db.query(School).filter(School.School_Code == payload.school_code).first()
     if not school:
         raise HTTPException(status_code=404, detail="School not found")
+
+
+    if payload.action_type=="inactive" or payload.action_type=="INACTIVE":
+        if school.activation_status==activation.INACTIVE:
+            raise HTTPException(status_code=400, details="School is already inactive")
+        else:
+            school.activation_status=activation.INACTIVE
+            db.commit()
+            db.refresh()
+            return "school inactive sucessfully"
+    elif payload.action_tye=="active" or payload.action_type=="ACTIVE":
+        if school.activation_status==activation.ACTIVE:
+            raise HTTPException(status_code= 400, details="school already is in active state")
+        else:
+            school.activation_status=activation.ACTIVE
+            db.commit()
+            db.refresh()
+            return "school activation sucessfully"
     
-  
-    return {"message": f"Action {payload.action_type} performed on school {payload.school_code}"}
 
 
 @router.post("/user_action")
@@ -232,4 +249,19 @@ async def action_user(
         raise HTTPException(status_code=404, detail="User not found")
         
     
-    return {"message": f"Action {payload.action_type} performed on user {payload.email}"}
+    if payload.action_type=="inactive" or payload.action_type=="INACTIVE":
+            if user.activation_status==activation.INACTIVE:
+                raise HTTPException(status_code=400, details="user is already inactive")
+            else:
+                user.activation_status=activation.INACTIVE
+                db.commit()
+                db.refresh()
+                return "user inactive sucessfully"
+    elif payload.action_tye=="active" or payload.action_type=="ACTIVE":
+            if user.activation_status==activation.ACTIVE:
+                raise HTTPException(status_code= 400, details="user already is in active state")
+            else:
+                user.activation_status=activation.ACTIVE
+                db.commit()
+                db.refresh()
+                return "user activation sucessfully"
