@@ -38,6 +38,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
 app.include_router(public_router)
 app.include_router(super_admin_router)
 app.include_router(content_admin_router)

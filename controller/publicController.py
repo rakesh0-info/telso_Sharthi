@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 import time
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Header, status
 from sqlalchemy.orm import Session
 
 from database_config import get_db
@@ -28,7 +28,6 @@ async def login(
     exist_user = db.query(User).filter(User.email == payload.email).first()
     clear_pass = payload.password.strip()
 
-   
     if not exist_user or not verify_password(clear_pass, exist_user.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -62,8 +61,9 @@ async def otp_verification(payload: otp_verify, db: Session = Depends(get_db)):
 
     user_otp = str(user.otp).strip().zfill(6)
     
-    
-    if clean_otp != user_otp or user.otp_expiry.timestamp() < time.time():
+ 
+    expiry_timestamp = user.otp_expiry.replace(tzinfo=timezone.utc).timestamp() if user.otp_expiry.tzinfo is None else user.otp_expiry.timestamp()
+    if clean_otp != user_otp or expiry_timestamp < time.time():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired OTP code."
@@ -71,7 +71,7 @@ async def otp_verification(payload: otp_verify, db: Session = Depends(get_db)):
 
     user.otp = None
     user.otp_expiry = None
-    user.last_login=datetime.now()
+    user.last_login = datetime.now()
     db.commit()
     db.refresh(user)
 
@@ -109,7 +109,6 @@ async def forget_pass(
     db.commit()
     db.refresh(exist_user)
 
-  
     bg_tasks.add_task(send_mail, exist_user.email, otp)
 
     return {
@@ -133,7 +132,8 @@ async def verify_otp_forget_pass(payload: otp_verify, db: Session = Depends(get_
         
     user_otp = str(user.otp).strip().zfill(6)
     
-    if clean_otp != user_otp or user.otp_expiry.timestamp() < time.time():
+    expiry_timestamp = user.otp_expiry.replace(tzinfo=timezone.utc).timestamp() if user.otp_expiry.tzinfo is None else user.otp_expiry.timestamp()
+    if clean_otp != user_otp or expiry_timestamp < time.time():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired OTP code."
@@ -150,10 +150,16 @@ async def verify_otp_forget_pass(payload: otp_verify, db: Session = Depends(get_
 
 
 @router.post("/reset_password")
-async def reset_pass(token: str, payload: reset_pass_Request, db: Session = Depends(get_db)):
-    user = verify_token(token, db)
+async def reset_pass(
+    payload: reset_pass_Request, 
+    token: str = Header(..., alias="Authorization"), 
+    db: Session = Depends(get_db)
+):
+    # Strip 'Bearer ' prefix if present in the header
+    if token.startswith("Bearer "):
+        token = token.split(" ")[1]
 
-    
+    user = verify_token(token, db)
 
     if not user:
         raise HTTPException(
@@ -162,10 +168,10 @@ async def reset_pass(token: str, payload: reset_pass_Request, db: Session = Depe
         )
 
     if user.otp is not None:
-                raise HTTPException(
-                    status_code= status.HTTP_400_BAD_REQUEST,
-                    detail="Bad Request  you have to verify the otp first"
-                )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Bad Request: you have to verify the otp first"
+        )
 
     is_verify = passwordCheack(payload.New_Password)
     if not is_verify:
@@ -174,13 +180,11 @@ async def reset_pass(token: str, payload: reset_pass_Request, db: Session = Depe
             detail="Password must be at least 8 characters and include at least one letter, number, and symbol."
         )
 
-    if payload.New_Password != payload.Confrim_Password:
+    if payload.New_Password != payload.Confirm_Password:
         raise HTTPException(
             status_code=status.HTTP_406_NOT_ACCEPTABLE,
             detail="New password and confirm password do not match."
         )
-
-   
 
     hashed_pwd = hash_password(payload.New_Password)
     user.password = hashed_pwd

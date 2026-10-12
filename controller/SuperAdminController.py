@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException ,status,Depends
+from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy.orm import Session
 from databaseModel.user_model import User
 from database_config import get_db
@@ -6,34 +6,35 @@ from jwts.DB_Security_Config import require_roles
 from enums.roleEnum import Role
 from requestModel.Action import school_action, user_Action
 from requestModel.School_Request import create_schools
-from requestModel.User_Request import create_users,AssignAchoolAdmin
+from requestModel.User_Request import create_users, AssignAchoolAdmin
 from databaseModel.School_model import School
 from util_validate.password_security import hash_password
 from enums.userActivationEnum import activation
 
-
-
-router=APIRouter(prefix="/Super_Admin/api/v1")
+router = APIRouter(prefix="/Super_Admin/api/v1")
 
 
 @router.get("/dashboard")
-async def dashboard( cur:User=Depends(require_roles(Role.SUPER_ADMIN))):
-    return " hy  i am Super admin"
+async def dashboard(cur: User = Depends(require_roles(Role.SUPER_ADMIN))):
+    return "hy i am Super admin"
 
 
 @router.post("/create_user")
-async def create_user(payload:create_users,db:Session=Depends(get_db),curr :User=Depends(require_roles(Role.SUPER_ADMIN))):
-
-    exist_user=db.query(User).filter(User.email==payload.email).first()
+async def create_user(
+    payload: create_users,
+    db: Session = Depends(get_db),
+    curr: User = Depends(require_roles(Role.SUPER_ADMIN))
+):
+    exist_user = db.query(User).filter(User.email == payload.email).first()
     if exist_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User Already exist"
         )
 
-    hash_pass=hash_password(payload.password)
+    hash_pass = hash_password(payload.password)
 
-    newUser=User(
+    newUser = User(
         first_Name=payload.first_name,
         last_Name=payload.last_name,
         email=payload.email,
@@ -45,9 +46,9 @@ async def create_user(payload:create_users,db:Session=Depends(get_db),curr :User
 
     db.add(newUser)
     db.commit()
+    db.refresh(newUser)
 
     return "User Added SucessFully"
-
 
 
 @router.post("/create_school")
@@ -67,17 +68,20 @@ async def create_school(
     admin_user_id = None
     
     if payload.school_admin_email:
-        
         admin_user = db.query(User).filter(User.email == payload.school_admin_email).first()
-        if admin_user:
-           
-            existing_assignment = db.query(School).filter(School.admin_id == admin_user.id).first()
-            if existing_assignment:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Selected user is already assigned as an admin to another school"
-                )
-            admin_user_id = admin_user.id
+        if not admin_user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="School admin email does not exist"
+            )
+        
+        existing_assignment = db.query(School).filter(School.admin_id == admin_user.id).first()
+        if existing_assignment:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Selected user is already assigned as an admin to another school"
+            )
+        admin_user_id = admin_user.id
 
     new_school = School(
         school_name=payload.school_name,
@@ -91,9 +95,9 @@ async def create_school(
     )
     db.add(new_school)
     db.commit()
+    db.refresh(new_school)
 
     return {"message": "New school added successfully"}
-
 
 
 @router.get("/all_school_admin")
@@ -101,15 +105,11 @@ async def get_all_school_admin(
     db: Session = Depends(get_db),
     curr: User = Depends(require_roles(Role.SUPER_ADMIN))
 ):
-    # Fetch all users who have the role of SCHOOL_ADMIN
     users = db.query(User).filter(User.role == Role.SCHOOL_ADMIN).all()
 
     response = []
     for u in users:
-        # Check if this school admin is already assigned to a school
         assigned_school = db.query(School).filter(School.admin_id == u.id).first()
-
-       
         if not assigned_school:
             user_data = {
                 "name": f"{u.first_Name} {u.last_Name}",
@@ -118,7 +118,6 @@ async def get_all_school_admin(
             response.append(user_data)
 
     return response
-
 
 
 @router.put("/assign_school_admin")
@@ -133,6 +132,13 @@ async def assign_School_Admin(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User does not exist"
+        )
+        
+    # Verify that the user possesses the SCHOOL_ADMIN role
+    if exist_user.role != Role.SCHOOL_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User does not have the SCHOOL_ADMIN role"
         )
         
     exist_school_admin = db.query(School).filter(School.admin_id == exist_user.id).first()
@@ -169,7 +175,6 @@ async def get_all_user(
     response = []
 
     for user in all_users:
-       
         school_name = user.schools[0].school_name if user.schools else None
         school_region = user.schools[0].Region if user.schools else None
 
@@ -218,24 +223,22 @@ async def action_School(
     if not school:
         raise HTTPException(status_code=404, detail="School not found")
 
-
-    if payload.action_type=="inactive" or payload.action_type=="INACTIVE":
-        if school.activation_status==activation.INACTIVE:
-            raise HTTPException(status_code=400, details="School is already inactive")
+    if payload.action_type == "inactive" or payload.action_type == "INACTIVE":
+        if school.activation_status == activation.INACTIVE:
+            raise HTTPException(status_code=400, detail="School is already inactive")
         else:
-            school.activation_status=activation.INACTIVE
+            school.activation_status = activation.INACTIVE
             db.commit()
-            db.refresh()
+            db.refresh(school)
             return "school inactive sucessfully"
-    elif payload.action_tye=="active" or payload.action_type=="ACTIVE":
-        if school.activation_status==activation.ACTIVE:
-            raise HTTPException(status_code= 400, details="school already is in active state")
+    elif payload.action_type == "active" or payload.action_type == "ACTIVE":
+        if school.activation_status == activation.ACTIVE:
+            raise HTTPException(status_code=400, detail="school already is in active state")
         else:
-            school.activation_status=activation.ACTIVE
+            school.activation_status = activation.ACTIVE
             db.commit()
-            db.refresh()
+            db.refresh(school)
             return "school activation sucessfully"
-    
 
 
 @router.post("/user_action")
@@ -248,20 +251,19 @@ async def action_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
-    
-    if payload.action_type=="inactive" or payload.action_type=="INACTIVE":
-            if user.activation_status==activation.INACTIVE:
-                raise HTTPException(status_code=400, details="user is already inactive")
-            else:
-                user.activation_status=activation.INACTIVE
-                db.commit()
-                db.refresh()
-                return "user inactive sucessfully"
-    elif payload.action_tye=="active" or payload.action_type=="ACTIVE":
-            if user.activation_status==activation.ACTIVE:
-                raise HTTPException(status_code= 400, details="user already is in active state")
-            else:
-                user.activation_status=activation.ACTIVE
-                db.commit()
-                db.refresh()
-                return "user activation sucessfully"
+    if payload.action_type == "inactive" or payload.action_type == "INACTIVE":
+        if user.activation_status == activation.INACTIVE:
+            raise HTTPException(status_code=400, detail="user is already inactive")
+        else:
+            user.activation_status = activation.INACTIVE
+            db.commit()
+            db.refresh(user)
+            return "user inactive sucessfully"
+    elif payload.action_type == "active" or payload.action_type == "ACTIVE":
+        if user.activation_status == activation.ACTIVE:
+            raise HTTPException(status_code=400, detail="user already is in active state")
+        else:
+            user.activation_status = activation.ACTIVE
+            db.commit()
+            db.refresh(user)
+            return "user activation sucessfully"
