@@ -134,7 +134,7 @@ async def assign_School_Admin(
             detail="User does not exist"
         )
         
-    # Verify that the user possesses the SCHOOL_ADMIN role
+    
     if exist_user.role != Role.SCHOOL_ADMIN:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
