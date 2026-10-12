@@ -14,14 +14,18 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 router=APIRouter(prefix="/content_admin/api/v1")
 
+
+async def dashboard(curr:User=Depends(require_roles(Role.CONTENT_ADMIN))):
+    return " this is content admin DashBoard"
+
 @router.post("/add_content")
 async def add_content(
     payload: str = Form(..., description="JSON string of CreateContentRequest"),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    curr: User = Depends(require_roles(Role.SUPER_ADMIN, Role.CONTENT_ADMIN))
+    curr: User = Depends(require_roles(Role.CONTENT_ADMIN))
 ):
-    # 1. Parse the JSON string payload into the Pydantic model
+   
     try:
         content_data = CreateContentRequest.model_validate_json(payload)
     except Exception as e:
