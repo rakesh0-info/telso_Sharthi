@@ -17,6 +17,6 @@ class LanguageEnum(str, Enum):
 
 class UploadStateEnum(str, Enum):
     NOT_START = "not start"
-    PROCESSING = "processing"
     READY = "ready"
+    FAILED="failed"
    

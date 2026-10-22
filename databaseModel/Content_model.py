@@ -10,13 +10,13 @@ class Content(Base):
     __tablename__ = "contents"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    content_type = Column(Enum(content_type), nullable=False)
+    content_type = Column(Enum(content_type, native_enum=False, create_type=False), nullable=False)
     title = Column(String, nullable=False)
-    language_type = Column(Enum(LanguageEnum), nullable=False)
+    language_type = Column(Enum(LanguageEnum, native_enum=False, create_type=False), nullable=False)
     des = Column(String, nullable=True)
     class_name = Column(String, default="XII", nullable=False)
-    subject = Column(Enum(subject), nullable=False)
+    subject = Column(Enum(subject, native_enum=False, create_type=False), nullable=False)
     file_url = Column(String, nullable=True)
-    file_upload_state = Column(Enum(UploadStateEnum), default=UploadStateEnum.NOT_START, nullable=False)
+    file_upload_state = Column(Enum(UploadStateEnum, native_enum=False, create_type=False), default=UploadStateEnum.NOT_START, nullable=False)
     last_update = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    update_by=Column(Integer,nullable=False)
+    update_by = Column(Integer, nullable=False)

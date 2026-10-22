@@ -68,7 +68,7 @@ async def create_school(
     admin_user_id = None
     
     if payload.school_admin_email:
-        admin_user = db.query(User).filter(User.email == payload.school_admin_email).first()
+        admin_user = db.query(User).filter(User.email == payload.school_admin_email,User.role==Role.SCHOOL_ADMIN).first()
         if not admin_user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

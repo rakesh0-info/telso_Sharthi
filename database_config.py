@@ -1,21 +1,33 @@
 import os
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
+
+from sqlalchemy import create_engine, text, MetaData
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
+
 if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL environment variable is not set.")
+    raise RuntimeError(
+        "DATABASE_URL environment variable is not set."
+    )
 
-engine_options = {}
+SCHEMA_NAME = "telso_sharthi"
+
+engine_options = {
+    "pool_pre_ping": True
+}
+
 if DATABASE_URL.startswith(("postgresql://", "postgresql+")):
-     engine_options["connect_args"] = {"options": '-csearch_path="telso_sharthi"'}  
-    # -> for render
-    # engine_options["connect_args"] = {"options": '-c search_path=Meet_up,public'}  
+    engine_options["connect_args"] = {
+        "options": f"-csearch_path={SCHEMA_NAME},public"
+    }
 
-engine = create_engine(DATABASE_URL, **engine_options)
+engine = create_engine(
+    DATABASE_URL,
+    **engine_options
+)
 
 SessionLocal = sessionmaker(
     autocommit=False,
@@ -23,13 +35,28 @@ SessionLocal = sessionmaker(
     bind=engine
 )
 
-if DATABASE_URL.startswith(("postgresql://", "postgresql+")):
-    with engine.connect() as connection:
-        connection.execute(text('CREATE SCHEMA IF NOT EXISTS "telso_sharthi"'))
-        connection.commit()
+# Create schema and ensure vector extension exists in public schema
+if engine.dialect.name == "postgresql":
+    with engine.begin() as connection:
+        # 1. Create your custom schema
+        connection.execute(
+            text(f'CREATE SCHEMA IF NOT EXISTS "{SCHEMA_NAME}"')
+        )
 
-Base = declarative_base()
-Base.metadata.schema = "telso_sharthi"
+        # 2. Ensure vector extension is installed in public
+        connection.execute(
+            text("CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public")
+        )
+
+        # 3. Set session search path
+        connection.execute(
+            text(f'SET search_path TO "{SCHEMA_NAME}", public')
+        )
+
+# Configure metadata schema
+metadata = MetaData(schema=SCHEMA_NAME)
+
+Base = declarative_base(metadata=metadata)
 
 
 def get_db():
