@@ -62,6 +62,7 @@ async def login(
 
 
 @router.post("/login_otp_verification")
+@limiter.limit("5/minute")
 async def otp_verification(payload: otp_verify, db: Session = Depends(get_db)):
     clean_email = payload.email.strip().lower()
     clean_otp = payload.otp_input.strip().zfill(6)
@@ -102,6 +103,7 @@ async def otp_verification(payload: otp_verify, db: Session = Depends(get_db)):
 
 
 @router.post("/forget_Pass")
+
 async def forget_pass(
     payload: forgetPass, 
     db: Session = Depends(get_db), 
@@ -133,6 +135,7 @@ async def forget_pass(
 
 
 @router.post("/forget_pass_otp_verification")
+@limiter.limit("5/minute")
 async def verify_otp_forget_pass(payload: otp_verify, db: Session = Depends(get_db)):
     clean_email = payload.email.strip().lower()
     clean_otp = payload.otp_input.strip().zfill(6)
@@ -165,6 +168,7 @@ async def verify_otp_forget_pass(payload: otp_verify, db: Session = Depends(get_
 
 
 @router.post("/reset_password")
+@limiter.limit("5/minute")
 async def reset_pass(
     payload: reset_pass_Request, 
     token: str = Header(..., alias="Authorization"), 
