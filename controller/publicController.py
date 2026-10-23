@@ -15,11 +15,11 @@ from requestModel.reset_pass import reset_pass_Request
 from util_validate.password_security import hash_password, verify_password
 from requestModel.loginOtp_verifyRequest import otp_verify
 from util_validate.pasword_name_validate import passwordCheack
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+# from slowapi import Limiter
+# from slowapi.util import get_remote_address
 
 
-limiter = Limiter(key_func=get_remote_address)
+# limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(prefix="/public/api/v1", tags=["Public"])
 
@@ -33,7 +33,7 @@ router = APIRouter(prefix="/public/api/v1", tags=["Public"])
 
 
 @router.post("/login")
-@limiter.limit("5/minute")
+# @limiter.limit("5/minute")
 async def login(
     request: Request,
     payload: loginRequest,
@@ -62,7 +62,7 @@ async def login(
 
 
 @router.post("/login_otp_verification")
-@limiter.limit("5/minute")
+# @limiter.limit("5/minute")
 async def otp_verification(payload: otp_verify, db: Session = Depends(get_db)):
     clean_email = payload.email.strip().lower()
     clean_otp = payload.otp_input.strip().zfill(6)
@@ -135,7 +135,7 @@ async def forget_pass(
 
 
 @router.post("/forget_pass_otp_verification")
-@limiter.limit("5/minute")
+# @limiter.limit("5/minute")
 async def verify_otp_forget_pass(payload: otp_verify, db: Session = Depends(get_db)):
     clean_email = payload.email.strip().lower()
     clean_otp = payload.otp_input.strip().zfill(6)
@@ -168,7 +168,7 @@ async def verify_otp_forget_pass(payload: otp_verify, db: Session = Depends(get_
 
 
 @router.post("/reset_password")
-@limiter.limit("5/minute")
+# @limiter.limit("5/minute")
 async def reset_pass(
     payload: reset_pass_Request, 
     token: str = Header(..., alias="Authorization"), 

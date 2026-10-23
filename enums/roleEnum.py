@@ -5,3 +5,5 @@ class Role(str,Enum):
     CONTENT_ADMIN="content_admin"
     SCHOOL_ADMIN="school_admin"
     USER="user"
+    TEACHER="teacher"
+    STUDENT="student"

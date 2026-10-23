@@ -1,5 +1,6 @@
 import os
 import shutil
+import traceback
 import uuid
 import logging
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status, Depends, UploadFile, File, Form
@@ -9,6 +10,7 @@ from sqlalchemy.orm import Session
 from collections import Counter
 import math
 
+from requestModel.Action import contentAdminAction
 from requestModel.Question_Request import GenerateQuestionRequest
 from service.question_generation_service import generate_question_set_with_ai
 from database_config import get_db
@@ -22,7 +24,7 @@ from databaseModel.QuestionSet_model import QuestionSetItem as questions,Questio
 
 from enums.contentEnum import UploadStateEnum
 from service.content_rag_service import process_content_document_background
-from enums.questionEnum import QuestionTypeEnum as question_types
+from enums.questionEnum import QuestionSetStatusEnum, QuestionTypeEnum as question_types
 from enums.questionEnum import QuestionSetStatusEnum as question_status
 
 from databaseModel.QuestionSet_model import QuestionSet, QuestionSetItem
@@ -273,9 +275,12 @@ async def generate_question_set(
             "total_questions": len(question_set.questions),
             "status": question_status.DRAFT
         }
-    except ValueError as ve:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+    except (ValueError, KeyError) as ve:  # Catch KeyError as well
+        # If it's a KeyError for 'subject', provide a clear message
+        error_msg = f"Missing required field: {str(ve)}" if isinstance(ve, KeyError) else str(ve)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error_msg)
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"AI Generation failed: {str(e)}")
 
 
@@ -961,3 +966,31 @@ ASSESSMENT DATA:
             "subjective_results": ai_graded_results
         }
     }
+
+
+
+@router.put("/take_action")
+async def action(payload:contentAdminAction,
+                   db: Session = Depends(get_db),
+                                   curr: User = Depends(require_roles(Role.CONTENT_ADMIN, Role.SUPER_ADMIN))):
+    exists_set=db.query(QuestionSet).filter(QuestionSet.id==contentAdminAction.questionSetid).first()
+
+    if not exists_set:
+        raise HTTPException(status_code=404, detail=status.HTTP_404_NOT_FOUND)
+
+    if payload.action_type=='draft' or payload.action_type=='DRAFT':
+        if exists_set.status==QuestionSetStatusEnum.DRAFT:
+            raise HTTPException(status_code=400,detail=status.HTTP_400_BAD_REQUEST)
+        exists_set.status=QuestionSetStatusEnum.DRAFT
+        db.commit()
+        db.refresh(exists_set)
+        return "Status updated Sucessfully"
+    elif payload.action_type == "ready" or payload.action_type == "READY":
+         if exists_set.status==QuestionSetStatusEnum.READY:
+                    raise HTTPException(status_code=400,detail=status.HTTP_400_BAD_REQUEST)
+         exists_set.status=QuestionSetStatusEnum.READY
+         db.commit()
+         db.refresh(exists_set)
+         return "Status updated to ready State Sucessfully"
+
+

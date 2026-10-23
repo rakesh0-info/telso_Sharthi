@@ -41,12 +41,14 @@ async def create_user(
         phone=payload.phone,
         password=hash_pass,
         role=payload.role,
+        
         activation_status=payload.activation_status
     )
 
     db.add(newUser)
     db.commit()
     db.refresh(newUser)
+    
 
     return "User Added SucessFully"
 
@@ -90,12 +92,17 @@ async def create_school(
         Region=payload.region,
         address=payload.address,
         phone=payload.phone,
-        admin_id=admin_user_id, 
+        admin_id=admin_user_id,
         activation_status=payload.activation_status
     )
     db.add(new_school)
     db.commit()
     db.refresh(new_school)
+
+    u=db.query(User).filter(User.email==payload.school_admin_email).first()
+    u.school_id=new_school.id
+    db.commit()
+    db.refresh(u)
 
     return {"message": "New school added successfully"}
 
@@ -118,6 +125,9 @@ async def get_all_school_admin(
             response.append(user_data)
 
     return response
+
+
+
 
 
 @router.put("/assign_school_admin")
@@ -162,7 +172,9 @@ async def assign_School_Admin(
     target_school.admin_id = exist_user.id
     db.commit()
     db.refresh(target_school)
-
+    exist_user.school_id==target_school.id
+    db.commit()
+    db.refresh(exist_user)
     return {"message": "Admin assigned to the school successfully"}
 
 

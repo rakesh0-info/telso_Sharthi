@@ -20,7 +20,8 @@ class School(Base):
     admin_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     
   
-    school_admin = relationship("User", back_populates="schools")
+    school_admin = relationship("User", foreign_keys=[admin_id], back_populates="administered_schools")
+    teachers = relationship("User", foreign_keys="User.school_id", back_populates="school")
 
     activation_status = Column(
         Enum(activation, name="activation_Status", schema="telso_sharthi", inherit_schema=True),

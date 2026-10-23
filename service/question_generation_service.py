@@ -39,8 +39,8 @@ def generate_question_set_with_ai(db: Session, payload: GenerateQuestionRequest,
         raise ValueError("Selected reference document does not exist.")
 
 
-    if doc.subject!=GenerateQuestionRequest.subject:
-        raise HTTPException(status_code=400, detail=status.HTTP_400_BAD_REQUEST)
+    # if doc.subject!=GenerateQuestionRequest.subject:
+    #     raise HTTPException(status_code=400, detail=status.HTTP_400_BAD_REQUEST)
     
     
     if doc.upload_status != UploadStateEnum.READY:
@@ -87,6 +87,7 @@ def generate_question_set_with_ai(db: Session, payload: GenerateQuestionRequest,
         ),
         )
     except Exception as e:
+        print("execption :",{e})
         raise HTTPException(status_code=503, detail=status.HTTP_503_SERVICE_UNAVAILABLE)
     
 

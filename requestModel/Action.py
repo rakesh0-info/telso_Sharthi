@@ -7,3 +7,7 @@ class school_action(BaseModel):
 class user_Action(BaseModel):
     email: EmailStr
     action_type: str
+
+class contentAdminAction(BaseModel):
+    questionSetid:int
+    action_type: str
