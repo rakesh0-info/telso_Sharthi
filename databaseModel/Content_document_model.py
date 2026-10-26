@@ -10,17 +10,17 @@ class ContentDocument(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     content_id = Column(Integer, ForeignKey("contents.id"), nullable=True, index=True)
-    subject = Column(String, index=True, nullable=False)
+    subject = Column(Integer, ForeignKey("subject.id"), nullable=True)  # Column remains 'subject'
     document_name = Column(String, nullable=False)
     file_path = Column(String, nullable=False)
-    # Using native_enum=False prevents PostgreSQL native ENUM validation errors
     upload_status = Column(SQLEnum(UploadStateEnum, native_enum=False, create_type=False), default=UploadStateEnum.NOT_START, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     content = relationship("Content")
     chunks = relationship("ContentDocumentChunk", back_populates="document", cascade="all, delete-orphan")
+    subject_obj = relationship("Subject", back_populates="documents")  # New relationship name
 
-
+    
 class ContentDocumentChunk(Base):
     __tablename__ = "content_document_chunks"
 

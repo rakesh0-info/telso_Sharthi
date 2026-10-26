@@ -39,7 +39,7 @@ class TeacherCreate(BaseModel):
     last_Name: str = Field(min_length=1, max_length=100)
     email: EmailStr
     phone: Optional[str] = None
-    subjects: Optional[str] = None
+    subjects_id: int
     school_id: int = Field(gt=0)
     assignments: List[ClassSectionAssignment] = Field(default_factory=list, max_length=100)
 

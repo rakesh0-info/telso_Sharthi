@@ -1,0 +1,32 @@
+Java is a high-level, object-oriented, and platform-independent programming language.
+
+Core Characteristics & Platform Independence
+
+• Write Once, Run Anywhere (WORA): Java source code (.java) is compiled into intermediate bytecode (.class) by the compiler. This bytecode can run on any machine with a compatible runtime environment, regardless of the underlying operating system.
+• No Direct Pointers: Java does not support explicit pointer manipulation, which reduces memory corruption and common security bugs found in languages like C or C++.
+• Automatic Garbage Collection: Memory management is handled automatically by the runtime environment to clean up unused objects and prevent memory leaks.
+
+The Three Js: JVM, JRE, and JDK
+
+• JVM (Java Virtual Machine): An abstract engine that loads, verifies, and executes Java bytecode, translating it into machine-specific instructions for your device.
+• JRE (Java Runtime Environment): A software package that physically exists and provides the minimum requirements (including the JVM and core libraries) needed to run a compiled Java program.
+• JDK (Java Development Kit): A complete software development kit used to write, compile, and debug Java programs; it includes the JRE plus development tools like the compiler (javac).
+
+Data Types in Java
+
+• Primitive Data Types: Basic, built-in types that store single values directly:
+	• Numeric (Integer): byte, short, int, long
+	• Numeric (Floating-point): float, double
+	• Character: char (stores single characters)
+	• Boolean: boolean (stores true or false)
+• Non-Primitive (Reference) Data Types: Complex structures that reference objects or collections of data, such as String, arrays, classes, and interfaces.
+
+Object-Oriented Programming (OOP) in Java
+
+Java relies on the OOP paradigm, though it is not considered 100% pure OOP because of its primitive data types and static members.
+• Class: A blueprint or template used to create objects, defining their attributes (variables) and behavior (methods).
+• Object: An instance of a class that holds a distinct state and identity in memory.
+• Encapsulation: Wrapping data (fields) and code (methods) together into a single unit while restricting direct access using access modifiers (private, public, protected).
+• Inheritance: A mechanism where one class acquires the properties and methods of another parent class for code reusability.
+• Polymorphism: The ability of a single method, operator, or object to take many forms across different contexts (such as method overloading and overriding).
+• Abstraction: Hiding complex implementation details and exposing only the essential features of an object using abstract classes or interfaces.

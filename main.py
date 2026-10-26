@@ -8,11 +8,13 @@ from fastapi.staticfiles import StaticFiles
 
 from database_config import engine, SessionLocal, Base
 import admin_seed
+import databaseModel
 
 from controller.publicController import router as public_router
 from controller.SuperAdminController import router as super_admin_router
 from controller.contentAdminController import router as content_admin_router
 from controller.SchoolAdminController import router as school_router
+from controller.TeacherController import router as teacher_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -45,3 +47,4 @@ app.include_router(public_router)
 app.include_router(super_admin_router)
 app.include_router(content_admin_router)
 app.include_router(school_router)
+app.include_router(teacher_router)
