@@ -2,7 +2,8 @@ from datetime import datetime, timedelta, timezone
 import time
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Header, Request, status
 from sqlalchemy.orm import Session
-
+from jose import jwt, JWTError
+import os
 from database_config import get_db
 from jwts.jwt_config import create_access_token
 from jwts.token_Verify import verify_token
@@ -15,32 +16,25 @@ from requestModel.reset_pass import reset_pass_Request
 from util_validate.password_security import hash_password, verify_password
 from requestModel.loginOtp_verifyRequest import otp_verify
 from util_validate.pasword_name_validate import passwordCheack
-# from slowapi import Limiter
-# from slowapi.util import get_remote_address
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 
-# limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(prefix="/public/api/v1", tags=["Public"])
 
-
-# @router.get("/api/limited-endpoint")
-# @limiter.limit("5/second")
-# async def limited_endpoint(request: Request):
-#     return {"message": "Request successful!"}
-
-
-
-
 @router.post("/login")
-# @limiter.limit("5/minute")
+@limiter.limit("5/minute")
 async def login(
     request: Request,
     payload: loginRequest,
     db: Session = Depends(get_db),
     bg_tasks: BackgroundTasks = BackgroundTasks()
 ):
-    exist_user = db.query(User).filter(User.email == payload.email).first()
+    # FIX: Normalize email input to prevent case-sensitivity login failures
+    clean_email = payload.email.strip().lower()
+    exist_user = db.query(User).filter(User.email == clean_email).first()
     clear_pass = payload.password.strip()
 
     if not exist_user or not verify_password(clear_pass, exist_user.password):
@@ -62,8 +56,8 @@ async def login(
 
 
 @router.post("/login_otp_verification")
-# @limiter.limit("5/minute")
-async def otp_verification(payload: otp_verify, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+async def otp_verification(request: Request, payload: otp_verify, db: Session = Depends(get_db)):
     clean_email = payload.email.strip().lower()
     clean_otp = payload.otp_input.strip().zfill(6)
 
@@ -77,7 +71,6 @@ async def otp_verification(payload: otp_verify, db: Session = Depends(get_db)):
 
     user_otp = str(user.otp).strip().zfill(6)
     
- 
     expiry_timestamp = user.otp_expiry.replace(tzinfo=timezone.utc).timestamp() if user.otp_expiry.tzinfo is None else user.otp_expiry.timestamp()
     if clean_otp != user_otp or expiry_timestamp < time.time():
         raise HTTPException(
@@ -87,7 +80,7 @@ async def otp_verification(payload: otp_verify, db: Session = Depends(get_db)):
 
     user.otp = None
     user.otp_expiry = None
-    user.last_login = datetime.now()
+    user.last_login = datetime.now(timezone.utc)
     db.commit()
     db.refresh(user)
 
@@ -103,20 +96,21 @@ async def otp_verification(payload: otp_verify, db: Session = Depends(get_db)):
 
 
 @router.post("/forget_Pass")
-
+@limiter.limit("3/minute")
 async def forget_pass(
+    request: Request,
     payload: forgetPass, 
     db: Session = Depends(get_db), 
     bg_tasks: BackgroundTasks = BackgroundTasks()
 ):
-    exist_user = db.query(User).filter(User.email == payload.email).first()
+    clean_email = payload.email.strip().lower()
+    exist_user = db.query(User).filter(User.email == clean_email).first()
+    
+    # Mitigation against email enumeration & secure response
     if not exist_user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="User does not exist"
-        )
-
-    reset_pass_token = create_access_token({"sub": exist_user.email, "scope": "forget_pass_token"})
+        return {
+            "message": "If the email exists in our system, an OTP has been sent for resetting the password."
+        }
 
     otp = generate_otp()
     expiry = datetime.now(timezone.utc) + timedelta(seconds=300)
@@ -128,15 +122,16 @@ async def forget_pass(
 
     bg_tasks.add_task(send_mail, exist_user.email, otp)
 
+    # FIX: REMOVED reset_pass_token from response body. 
+    # Tokens should only be issued AFTER successful OTP verification.
     return {
-        "reset_pass_token": reset_pass_token,
-        "message": "OTP sent to your mail for resetting the password."
+        "message": "If the email exists in our system, an OTP has been sent for resetting the password."
     }
 
 
 @router.post("/forget_pass_otp_verification")
-# @limiter.limit("5/minute")
-async def verify_otp_forget_pass(payload: otp_verify, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+async def verify_otp_forget_pass(request: Request, payload: otp_verify, db: Session = Depends(get_db)):
     clean_email = payload.email.strip().lower()
     clean_otp = payload.otp_input.strip().zfill(6)
      
@@ -157,39 +152,61 @@ async def verify_otp_forget_pass(payload: otp_verify, db: Session = Depends(get_
             detail="Invalid or expired OTP code."
         )
      
+    # Clear OTP
     user.otp = None
     user.otp_expiry = None
     db.commit()
     db.refresh(user)
 
+    # FIX: Issue a strict short-lived reset token ONLY after successful OTP verification
+    reset_pass_token = create_access_token({"sub": user.email, "scope": "forget_pass_token"}, expires_delta=timedelta(minutes=5))
+
     return {
-        "message": "OTP verified successfully"
+        "success": True,
+        "reset_pass_token": reset_pass_token,
+        "message": "OTP verified successfully. Use the reset token to update your password."
     }
 
 
 @router.post("/reset_password")
-# @limiter.limit("5/minute")
+@limiter.limit("5/minute")
 async def reset_pass(
+    request: Request,
     payload: reset_pass_Request, 
     token: str = Header(..., alias="Authorization"), 
     db: Session = Depends(get_db)
 ):
-    # Strip 'Bearer ' prefix if present in the header
     if token.startswith("Bearer "):
         token = token.split(" ")[1]
 
-    user = verify_token(token, db)
+  
+    try:
+        payload_data = verify_token(token, db) # Assuming verify_token returns decoded payload or user depending on helper implementation
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
 
+    # If verify_token returns a User object, decode token payload separately for scope check if needed,
+    # or ensure verify_token validates the scope. Here we validate scope via payload inspection:
+
+    try:
+        decoded_payload = jwt.decode(token, os.getenv("SECRET_KEY"), algorithms=[os.getenv("ALGORITHM", "HS256")])
+        if decoded_payload.get("scope") != "forget_pass_token":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid token scope for password reset")
+        user_email = decoded_payload.get("sub")
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized Access")
+
+    user = db.query(User).filter(User.email == user_email).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Unauthorized Access"
+            detail="User not found"
         )
 
     if user.otp is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Bad Request: you have to verify the otp first"
+            detail="Bad Request: OTP verification required."
         )
 
     is_verify = passwordCheack(payload.New_Password)

@@ -74,3 +74,49 @@ School Administration
     except Exception as e:
         print(f"Failed to send email: {e}")
         raise RuntimeError(f"Teacher created, but email dispatch failed: {e}")
+
+
+def send_LabAssistent_welcome_email(to_email: str, LabName: str, temp_password: str, school_obj):
+    smtp_host = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", 465))
+    sender_email = os.getenv("SENDER_EMAIL") or os.getenv("SMTP_USER")
+    sender_password = os.getenv("SMTP_PASSWORD")
+
+    msg = EmailMessage()
+    msg['Subject'] = f"Welcome to {school_obj.school_name} - Telso Sharthi Credentials"
+    msg['From'] = sender_email
+    msg['To'] = to_email
+
+    msg.set_content(f"""
+Hello {LabName},
+
+Your Lab Assistent account has been successfully created for {school_obj.school_name}.
+
+--- School Information ---
+• School Name: {school_obj.school_name}
+• School Code: {school_obj.School_Code}
+• District: {school_obj.District}
+• Region: {school_obj.Region}
+• Address: {school_obj.address or 'N/A'}
+• Phone: {school_obj.phone or 'N/A'}
+
+--- Your Login Credentials ---
+Email: {to_email}
+Temporary Password: {temp_password}
+
+Please log in and update your password immediately.
+
+Best regards,
+School Administration
+""")
+    try:
+        with smtplib.SMTP_SSL(smtp_host, smtp_port) as server:
+            server.login(sender_email, sender_password)
+            server.send_message(msg)
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+        raise RuntimeError(f"Teacher created, but email dispatch failed: {e}")
+
+
+
+

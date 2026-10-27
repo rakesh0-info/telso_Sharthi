@@ -7,3 +7,4 @@ class Role(str,Enum):
     USER="user"
     TEACHER="teacher"
     STUDENT="student"
+    LAB_ASSISTANT="Lab_Assistant"

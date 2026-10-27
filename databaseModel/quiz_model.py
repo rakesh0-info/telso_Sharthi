@@ -9,6 +9,7 @@ from sqlalchemy import (
     DateTime,
     Enum as SQLEnum,
     ForeignKey,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship, synonym
 from pgvector.sqlalchemy import Vector
@@ -69,9 +70,10 @@ class Quiz(Base):
     school_id = Column(Integer, ForeignKey("school.id", ondelete="CASCADE"), nullable=False)
     class_id = Column(Integer, ForeignKey("class.id", ondelete="CASCADE"), nullable=False)
     section_id = Column(Integer, ForeignKey("class_section.id", ondelete="CASCADE"), nullable=False)
+    subject_id = Column(Integer, ForeignKey("subject.id", ondelete="CASCADE"), nullable=True) # <--- Added subject_id
     teacher_id = Column(Integer, ForeignKey("teacher.id", ondelete="CASCADE"), nullable=False)
     no_of_register = Column(Integer, default=0, nullable=False)
-    quiz_time = Column(Integer, nullable=False)  # in minutes
+    quiz_time = Column(Integer, nullable=False)
     publish = Column(Boolean, default=False, nullable=False)
     is_start = Column(Boolean, default=False, nullable=False)
     upload_quize_doc_id = Column(Integer, ForeignKey("quize_doc.id", ondelete="SET NULL"), nullable=True)
@@ -81,6 +83,7 @@ class Quiz(Base):
     school = relationship("School")
     class_obj = relationship("ClassModel")
     section = relationship("ClassSection")
+    subject = relationship("Subject") # <--- Added relationship
     teacher = relationship("Teacher", back_populates="quizzes")
     quiz_doc = relationship("QuizDoc", back_populates="quizzes")
     questions = relationship("QuizQuestionSet", back_populates="quiz", cascade="all, delete-orphan")
@@ -136,6 +139,10 @@ class QuizResult(Base):
     time_taken = Column(Time, nullable=True)
     total_score = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint('quize_id', 'student_id', name='uq_quiz_student_submission'),
+    )
 
     # Synonyms
     quiz_id = synonym("quize_id")

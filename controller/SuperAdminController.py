@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, Query, status, Depends
 from sqlalchemy.orm import Session
 from databaseModel.user_model import User
 from database_config import get_db
@@ -172,35 +172,83 @@ async def assign_School_Admin(
     target_school.admin_id = exist_user.id
     db.commit()
     db.refresh(target_school)
-    exist_user.school_id==target_school.id
+    exist_user.school_id=target_school.id
     db.commit()
     db.refresh(exist_user)
     return {"message": "Admin assigned to the school successfully"}
 
 
-@router.get("/get_all_user")
-async def get_all_user(
+
+
+
+@router.get("/get_all_users", summary="Get all users with pagination and school details")
+async def get_all_users(
+    skip: int = Query(0, ge=0, description="Number of records to skip for pagination"),
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of records to return (Max 500)"),
     db: Session = Depends(get_db),
     curr: User = Depends(require_roles(Role.SUPER_ADMIN))
 ):
-    all_users = db.query(User).all()
+    """
+    Retrieves a paginated list of all system users with their associated school and region info.
+    Restricted strictly to SUPER_ADMIN.
+    """
+    # 1. Fetch users with pagination limits to prevent memory exhaustion
+    users = db.query(User).offset(skip).limit(limit).all()
+    
+    if not users:
+        return {
+            "success": True,
+            "skip": skip,
+            "limit": limit,
+            "count": 0,
+            "users": []
+        }
+
     response = []
+    for user in users:
+        # Safely resolve school and region attributes across various relationship structures
+        school_name = None
+        school_region = None
+        
+        if hasattr(user, "schools") and user.schools:
+            school_name = getattr(user.schools[0], "school_name", None)
+            school_region = getattr(user.schools[0], "Region", None)
+        elif hasattr(user, "school") and user.school:
+            school_name = getattr(user.school, "school_name", None)
+            school_region = getattr(user.school, "Region", None)
 
-    for user in all_users:
-        school_name = user.schools[0].school_name if user.schools else None
-        school_region = user.schools[0].Region if user.schools else None
+        # Ensure enums serialize cleanly as strings
+        role_str = user.role.value if hasattr(user.role, "value") else str(user.role)
+        
+        activation_val = getattr(user, "activation_status", getattr(user, "activation", "ACTIVE"))
+        activation_str = activation_val.value if hasattr(activation_val, "value") else str(activation_val)
 
-        res = {
-            "name": f"{user.first_Name} {user.last_Name}",
+        # Handle name formatting flexibly (first/last vs single name attribute)
+        first_name = getattr(user, "first_Name", "") or ""
+        last_name = getattr(user, "last_Name", "") or ""
+        full_name = f"{first_name} {last_name}".strip() or getattr(user, "name", "N/A")
+
+        response.append({
+            "user_id": user.id,
+            "name": full_name,
             "email": user.email,
-            "role": user.role,
+            "role": role_str,
             "school": school_name,
             "region": school_region,
+            "status": activation_str,
             "last_login": user.last_login
-        }
-        response.append(res)
+        })
 
-    return response
+    return {
+        "success": True,
+        "skip": skip,
+        "limit": limit,
+        "count": len(response),
+        "users": response
+    }
+
+
+
 
 
 @router.get("/get_all_school")

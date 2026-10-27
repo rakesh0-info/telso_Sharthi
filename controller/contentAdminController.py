@@ -397,9 +397,9 @@ async def get_all_questionSet(
 @router.post("/submit_and_evaluate")
 def submit_and_evaluate_assessment(
     payload: SubmitAssessmentRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    curr: User = Depends(require_roles(Role.STUDENT, Role.CONTENT_ADMIN, Role.SUPER_ADMIN))
 ):
-
    
 
     question_set = (

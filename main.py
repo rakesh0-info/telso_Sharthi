@@ -15,7 +15,8 @@ from controller.SuperAdminController import router as super_admin_router
 from controller.contentAdminController import router as content_admin_router
 from controller.SchoolAdminController import router as school_router
 from controller.TeacherController import router as teacher_router
-
+from controller.StudentController import router as student_router
+from controller.LabAssistantController import router as lab_assitant_router
 Base.metadata.create_all(bind=engine)
 
 
@@ -48,3 +49,5 @@ app.include_router(super_admin_router)
 app.include_router(content_admin_router)
 app.include_router(school_router)
 app.include_router(teacher_router)
+app.include_router(student_router)
+app.include_router(lab_assitant_router)

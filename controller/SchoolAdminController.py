@@ -2,7 +2,7 @@ import io
 import os
 from typing import Annotated, List, Optional
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Path, status, Depends, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, Path, status, Depends, UploadFile, File, Form,BackgroundTasks
 from fastapi.responses import StreamingResponse
 import pandas as pd
 from pydantic import BaseModel, EmailStr, TypeAdapter, TypeAdapter, ValidationError
@@ -23,7 +23,7 @@ from databaseModel.scheduler_model import ClassScheduler
 from enums.roleEnum import Role
 from enums.dbEnums import StatusEnum
 from jwts.DB_Security_Config import require_roles
-from mail.sendmail import send_teacher_welcome_email
+from mail.sendmail import send_LabAssistent_welcome_email, send_teacher_welcome_email
 from otp_generate.randomKey import get_random_pass
 from util_validate.password_security import hash_password
 
@@ -231,8 +231,9 @@ def separate_teacher(teacher_id: Annotated[int, Path(gt=0)],
 @router.post('/add-lab-assistant', status_code=status.HTTP_201_CREATED)
 def add_lab_assistant(payload: LabAssistantCreateRequest,
                       db: Session = Depends(get_db),
+                      Bg_task=BackgroundTasks,
                       curr: User = Depends(require_roles(Role.SCHOOL_ADMIN, Role.SUPER_ADMIN))):
-    authorize_school(db, curr, payload.school_id)
+    school= authorize_school(db, curr, payload.school_id)
     
     existing = db.query(User).filter(User.email == payload.email.strip().lower()).first()
     if existing:
@@ -245,7 +246,7 @@ def add_lab_assistant(payload: LabAssistantCreateRequest,
             name=payload.name,
             email=payload.email.strip().lower(),
             password=hash_password(temp_pass),
-            role="LAB_ASSISTANT",
+            role=Role.LAB_ASSISTANT,
             phonenumber=payload.phone,
             activation=StatusEnum.ACTIVE
         )
@@ -260,6 +261,17 @@ def add_lab_assistant(payload: LabAssistantCreateRequest,
         )
         db.add(lab)
         db.commit()
+
+          # Send welcome email asynchronously / safely
+        try:
+            Bg_task.add_task(send_LabAssistent_welcome_email(
+                        to_email=user.email,
+                        LabName=user.name,
+                        temp_password=temp_pass,
+                        school_obj=school
+                    ))
+        except Exception:
+                    pass  
         return {"success": True, "message": "Lab assistant added and assigned to lab successfully", "user_id": user.id, "lab_id": lab.id}
     except SQLAlchemyError as exc:
         db.rollback()
